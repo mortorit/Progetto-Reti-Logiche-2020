@@ -1,0 +1,131 @@
+----------------------------------------------------------------------------------
+-- Company: Politecnico di Milano   
+-- Engineer: Cristian Sbrolli
+-- 
+-- Create Date: 25.02.2020 23:51:28
+-- Design Name: PFRL
+-- Module Name: progetto - Behavioral
+-- Project Name: ProgettoRL
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity project_reti_logiche is
+port (
+i_clk : in std_logic;
+i_start : in std_logic;
+i_rst : in std_logic;
+i_data : in std_logic_vector(7 downto 0);
+o_address : out std_logic_vector(15 downto 0);
+o_done : out std_logic;
+o_en : out std_logic;
+o_we : out std_logic;
+o_data : out std_logic_vector (7 downto 0)
+);
+end project_reti_logiche;
+
+architecture Behavioral of project_reti_logiche is
+
+type state_type is(
+    START,  -- Stato Iniziale Della Macchina
+    GETIND,--Richiede l'indirizzo da codificare
+    WAITMEM,--aspetta la memoria
+    CHECKWB,--Verifica l'appartenenza alla WB e in caso negativo richiede la prossima finche non sono finite
+    COD,--Gestisce la codifica dell'indirizzo e lo manda alla memoria
+    DONE -- Porta il segnale o_done a 1 e aspetta l'abbassamento di start
+    );
+    
+signal STATE: state_type;
+
+begin
+    process(i_clk,i_rst)
+    --dichiarazione variabili
+    
+    variable IND: std_logic_vector(6 downto 0);
+    variable BASENUM:std_logic_vector(2 downto 0);
+    variable SUB: std_logic_vector(8 downto 0);
+    variable FOUND: bit;
+    variable OFFSETOH: std_logic_vector(3 downto 0);
+    
+    begin
+    
+    if(i_rst = '1') then
+        STATE <= START;      
+        
+    elsif(rising_edge(i_clk)) then 
+        case STATE is 
+            
+            when START =>
+                BASENUM:= "001";
+                if i_start= '1' and i_rst= '0' then
+                    o_address <= std_logic_vector(to_unsigned( 8 , 16));
+                    o_en<='1';
+                    o_we<='0';
+                    STATE <= WAITMEM;
+                    found:= '0';
+                    offsetoh:= (others => '0');
+                end if;
+            
+            when WAITMEM =>
+                STATE <= GETIND;
+                o_address <= x"0000";             
+           
+            when GETIND =>
+                IND := i_data(6 downto 0);
+                STATE <= CHECKWB;
+                o_address <=  "0000000000000" & basenum;
+            
+            when CHECKWB =>          
+                sub:= std_logic_vector(unsigned("00" & ind) - unsigned('0'& i_data));
+                if unsigned(sub) <= 3 then
+                STATE <= COD;
+                found:= '1';
+                else
+                    if (basenum = "000") then
+                        STATE <= COD;
+                    else
+                        basenum := basenum + "1";
+                        o_address <= "0000000000000" & basenum;
+                        STATE<=CHECKWB;
+                    end if;             
+                end if;
+            
+            when COD =>
+                if (found = '1') then
+                offsetoh(to_integer(unsigned(sub(1 downto 0)))):= '1';
+                o_data <= '1' & (basenum-"1") & offsetoh;
+                else
+                o_data <= '0' & ind;
+                end if;
+                o_address <= "0000000000001001";
+                o_we <= '1';
+                STATE <= DONE;
+            
+            when DONE =>
+                if i_start = '0' then
+                    o_done <= '0';
+                    STATE <= START;
+                else
+                o_en <= '0'; -- Disabilito la lettura
+                o_we <= '0'; -- Disabilito la scrittura
+                o_done <= '1'; -- Alzo il segnale di Done
+                end if;
+                           
+            end case;
+        end if;                
+    end process;
+end Behavioral;
