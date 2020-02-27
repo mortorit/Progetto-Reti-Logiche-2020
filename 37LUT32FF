@@ -41,10 +41,10 @@ end project_reti_logiche;
 architecture Behavioral of project_reti_logiche is
 
 type state_type is(
-    START,  -- Stato Iniziale Della Macchina
+    WAITSTART,  -- Stato Iniziale Della Macchina, in cui si attende il segnale di start
     GETIND,--Richiede l'indirizzo da codificare
     WAITMEM,--aspetta la memoria
-    CHECKWZ,--Verifica l'appartenenza alla WZ e in caso negativo richiede la prossima (se esiste)
+    CHECKWZ,--Verifica la WZ e scrive il risultato una volta trovato o finite le WZ
     DONE -- Porta il segnale o_done a 1 e aspetta l'abbassamento di start
     );
     
@@ -67,12 +67,12 @@ begin
         o_en<='0';
         o_we<='0';
         o_done<='0';
-        STATE <= START;      
+        STATE <= WAITSTART;      
         
     elsif(rising_edge(i_clk)) then 
         case STATE is 
             
-            when START =>
+            when WAITSTART =>
                 if i_start= '1' and i_rst= '0' then
                     BASENUM:= "001";
                     offsetoh:= (others => '0');
@@ -126,7 +126,7 @@ begin
                 o_data<= (others => '-');
                 if i_start = '0' then
                     o_done <= '0';
-                    STATE <= START;
+                    STATE <= WAITSTART;
                 else
                 o_en <= '0'; -- Disabilito la lettura
                 o_we <= '0'; -- Disabilito la scrittura
