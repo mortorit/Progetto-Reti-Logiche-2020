@@ -41,11 +41,11 @@ end project_reti_logiche;
 architecture Behavioral of project_reti_logiche is
 
 type state_type is(
-    WAITSTART,  -- Stato Iniziale Della Macchina, in cui si attende il segnale di start
-    GETIND,--Richiede l'indirizzo da codificare
-    WAITMEM,--aspetta la memoria
-    CHECKWZ,--Verifica la WZ e scrive il risultato una volta trovato o finite le WZ
-    DONE -- Porta il segnale o_done a 1 e aspetta l'abbassamento di start
+    WAITSTART,  -- Attesa del segnale di start, richiede l'indirizzo da codificare
+    WAITIND,-- Stato per l'attesa dell'indirizzo, nel frattempo richede la prima WZ
+    GETIND,-- Riceve l'indirizzo da codificare, richiede la seconda WZ
+    CHECKWZ,--Verifica le WZ in autoanello, settando l'uscita quando riconosce la WZ/quando sono finite
+    DONE -- Porta o_done a 1 e aspetta che start si abbassi
     );
     
 signal STATE: state_type;
@@ -62,8 +62,8 @@ begin
     begin
     
     if(i_rst = '1') then
-        o_data<= (others => '-');
-        o_address <= (others => '-');
+        o_data<= (others => '-');--queste due sono settate esplicitamente a DC per diminuire il numero di LUT
+        o_address <= (others => '-'); 
         o_en<='0';
         o_we<='0';
         o_done<='0';
@@ -80,17 +80,17 @@ begin
                     o_en<='1';
                     o_we<='0';
                     o_data<= (others => '-');
-                    STATE <= WAITMEM;                                  
+                    STATE <= GETIND;                                  
                 end if;
             
-            when WAITMEM =>       
+            when GETIND =>       
                 o_en<='1';
                 o_we<='0';         
                 o_data<= (others => '-');
                 o_address <= (others => '0');    
-                STATE <= GETIND;
+                STATE <= WAITIND;
                 
-            when GETIND =>
+            when WAITIND =>
                 o_en<='1';
                 o_we<='0';
                 o_data<= (others => '-');
