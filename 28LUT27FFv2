@@ -1,0 +1,139 @@
+----------------------------------------------------------------------------------
+-- Company: Politecnico di Milano   
+-- Engineer: Cristian Sbrolli
+-- 
+-- Create Date: 25.02.2020 23:51:28
+-- Design Name: PFRL
+-- Module Name: progetto - Behavioral
+-- Project Name: ProgettoRL
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity project_reti_logiche is
+port (
+i_clk : in std_logic;
+i_start : in std_logic;
+i_rst : in std_logic;
+i_data : in std_logic_vector(7 downto 0);
+o_address : out std_logic_vector(15 downto 0);
+o_done : out std_logic;
+o_en : out std_logic;
+o_we : out std_logic;
+o_data : out std_logic_vector (7 downto 0)
+);
+end project_reti_logiche;
+
+architecture Behavioral of project_reti_logiche is
+
+type state_type is(
+    WAITSTART,  -- Attesa del segnale di start, richiede l'indirizzo da codificare
+    GETIND,-- Riceve l'indirizzo da codificare, richiede la seconda WZ
+    CHECKWZ,--Verifica le WZ in autoanello, settando l'uscita quando riconosce la WZ/quando sono finite
+    DONE -- Porta o_done a 1 e aspetta che start si abbassi
+    );
+    
+signal STATE: state_type;
+
+begin
+    process(i_clk,i_rst)
+    --dichiarazione variabili
+    
+    variable IND: std_logic_vector(6 downto 0);
+    variable BASENUM:std_logic_vector(2 downto 0);
+    variable OFFSETOH: std_logic_vector(3 downto 0);
+    
+    begin
+    
+    if(i_rst = '1') then
+        o_data<= (others => '-');--queste due sono settate esplicitamente a DC per diminuire il numero di LUT
+        o_address <= (others => '-'); 
+        basenum:= (others => '-');
+        offsetoh:= (others => '-');
+        o_en<='0';
+        o_we<='0';
+        o_done<='0';
+        STATE <= WAITSTART;      
+        
+    elsif(falling_edge(i_clk)) then 
+        case STATE is 
+            
+            when WAITSTART =>
+                if i_start= '1' and i_rst= '0' then
+                    BASENUM:= (others => '-');
+                    offsetoh:= (others => '-');
+                    o_address <= std_logic_vector(to_unsigned( 8 , 16));
+                    o_en<='1';
+                    o_we<='0';
+                    o_data<= (others => '-');
+                    STATE <= GETIND;                                  
+                end if;
+            
+            when GETIND =>    
+                IND := i_data(6 downto 0);     
+                BASENUM:= "000";   
+                offsetoh:= (others => '-');
+                o_en<='1';
+                o_we<='0';         
+                o_data<= (others => '-');
+                o_address <=  "0000000000000" & basenum; 
+                STATE <= CHECKWZ;
+
+            when CHECKWZ =>   
+                offsetoh:= (others => '-');
+                o_en<= '1';               
+                if (('0' & ind) - (i_data)) <= 3 then
+                    offsetoh:= (others => '0');
+                    offsetoh(to_integer(unsigned(('0' & ind) -  i_data))):= '1';
+                    o_data <= '1' & basenum & offsetoh;
+                    o_address <= "0000000000001001";
+                    o_we <= '1';
+                    STATE <= DONE;
+                else
+                    if (basenum = "111") then
+                        basenum:= (others => '-');
+                        o_data <= '0' & ind;
+                        o_address <= "0000000000001001";
+                        o_we <= '1';
+                        STATE <= DONE;                       
+                    else
+                        o_data<= (others => '-');
+                        basenum := basenum + '1';
+                        o_address <= "0000000000000" & basenum;
+                        o_we<='0';
+                    end if;             
+                end if;
+            
+            when DONE =>
+                ind:= (others => '-');
+                offsetoh:= (others => '-');
+                basenum:= (others => '-');
+                o_address <= (others => '-');
+                o_data<= (others => '-');
+                if i_start = '0' then
+                    o_done <= '0';
+                    STATE <= WAITSTART;
+                else
+                o_en <= '0';
+                o_we <= '0';
+                o_done <= '1';
+                end if;
+                           
+            end case;
+        end if;                
+    end process;
+end Behavioral;
